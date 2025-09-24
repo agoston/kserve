@@ -208,7 +208,7 @@ def test_files_with_no_extension(mock_storage):
 
 
 def test_get_S3_config():
-    DEFAULT_CONFIG = Config()
+    DEFAULT_CONFIG = Config(max_pool_connections=40)
     ANON_CONFIG = Config(signature_version=UNSIGNED)
     VIRTUAL_CONFIG = Config(s3={"addressing_style": "virtual"})
     USE_ACCELERATE_CONFIG = Config(s3={"use_accelerate_endpoint": True})
