@@ -5,7 +5,7 @@ ARG WORKSPACE_DIR=/kserve-workspace
 
 #################### BASE BUILD IMAGE ####################
 # prepare basic build environment
-FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu24.04 AS base
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu25.10 AS base
 
 ARG WORKSPACE_DIR
 ARG CUDA_VERSION=12.8.1
@@ -13,13 +13,17 @@ ARG PYTHON_VERSION=3.12
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y \
-    && apt-get install -y ccache software-properties-common git curl sudo python3-pip python3.12-venv gcc python-is-python3 \
+    && apt-get install -y ccache software-properties-common git curl sudo python3-pip python3-venv gcc python-is-python3 \
     && python3 --version && python3 -m pip --version \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install uv and ensure it's in PATH
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
     ln -s /root/.local/bin/uv /usr/local/bin/uv
+
+# workaround for using built-in python
+RUN echo '[global]' >>/etc/pip.conf && \
+    echo 'break-system-packages = true' >>/etc/pip.conf
 
 # Workaround for https://github.com/openai/triton/issues/2507 and
 # https://github.com/pytorch/pytorch/issues/107960 -- hopefully
@@ -110,7 +114,7 @@ RUN mkdir -p third_party/library && python3 pip-licenses.py
 #################### WHEEL BUILD IMAGE ####################
 
 #################### PROD IMAGE ####################
-FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu24.04 AS prod
+FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu25.10 AS prod
 
 ARG WORKSPACE_DIR
 ARG CUDA_VERSION=12.8.1
@@ -123,7 +127,7 @@ WORKDIR ${WORKSPACE_DIR}
 RUN apt-get update -y \
     && apt-get upgrade -y \
     && apt-get install -y software-properties-common curl \
-    && apt-get install -y ffmpeg libsm6 libxext6 libgl1 gcc python3-pip python3.12-venv libibverbs-dev \
+    && apt-get install -y ffmpeg libsm6 libxext6 libgl1 gcc python3-pip python3-venv libibverbs-dev \
     && python3 --version && python3 -m pip --version \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
