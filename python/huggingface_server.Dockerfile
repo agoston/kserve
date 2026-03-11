@@ -12,10 +12,25 @@ ARG CUDA_VERSION=12.8.1
 ARG PYTHON_VERSION=3.12
 ENV DEBIAN_FRONTEND=noninteractive
 
+ENV PIP_ROOT_USER_ACTION=ignore
+
 RUN apt-get update -y \
-    && apt-get install -y ccache software-properties-common git curl sudo python3-pip python3-venv gcc python-is-python3 \
-    && python3 --version && python3 -m pip --version \
+    && apt-get install -y ccache software-properties-common git curl sudo checkinstall \
+    && apt install -y software-properties-common build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev curl libsqlite3-dev wget llvm libbz2-dev tk-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN cd /usr/src \
+    && wget https://www.python.org/ftp/python/3.12.13/Python-3.12.13.tgz \
+    && tar -xf Python-3.12.13.tgz \
+    && cd Python-3.12.13 \
+    && ./configure --enable-optimizations \
+    && make -j$(nproc) \
+    && checkinstall -D --fstrans=no --nodoc --provides= --pkgname=python3.12 -y make altinstall
+
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python${PYTHON_VERSION} 1 \
+    && update-alternatives --set python3 /usr/local/bin/python${PYTHON_VERSION} \
+    && ln -sf /usr/bin/python${PYTHON_VERSION}-config /usr/bin/python3-config \
+    && python3 --version && python3 -m pip --version
 
 # Install uv and ensure it's in PATH
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
@@ -49,8 +64,8 @@ WORKDIR ${WORKSPACE_DIR}
 FROM base AS build
 
 ARG WORKSPACE_DIR
-ARG VLLM_VERSION=0.9.2
-ARG LMCACHE_VERSION=0.3.0
+ARG VLLM_VERSION=0.11.2
+ARG LMCACHE_VERSION=0.3.15
 ARG FLASHINFER_VERSION=0.2.6.post1
 # Need a separate CUDA arch list for flashinfer because '7.0' is not supported by flashinfer
 ARG FLASHINFER_CUDA_ARCH_LIST="7.5 8.0 8.6 8.9 9.0+PTX"
@@ -127,9 +142,15 @@ WORKDIR ${WORKSPACE_DIR}
 RUN apt-get update -y \
     && apt-get upgrade -y \
     && apt-get install -y software-properties-common curl \
-    && apt-get install -y ffmpeg libsm6 libxext6 libgl1 gcc python3-pip python3-venv libibverbs-dev \
-    && python3 --version && python3 -m pip --version \
+    && apt-get install -y ffmpeg libsm6 libxext6 libgl1 gcc libibverbs-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN --mount=type=bind,from=base,source=/usr/src/Python-3.12.13/python3.12_3.12.13-1_amd64.deb,target=/tmp/python.deb apt-get install /tmp/python.deb
+
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python${PYTHON_VERSION} 1 \
+    && update-alternatives --set python3 /usr/local/bin/python${PYTHON_VERSION} \
+    && ln -sf /usr/bin/python${PYTHON_VERSION}-config /usr/bin/python3-config \
+    && python3 --version && python3 -m pip --version
 
 ARG VENV_PATH
 # Activate virtual env by setting VIRTUAL_ENV

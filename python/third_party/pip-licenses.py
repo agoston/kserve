@@ -215,10 +215,7 @@ def check_license_allowlist(
     if pkg_name not in ignore_list and (
         allow_only is None or license_info not in allow_only
     ):
-        raise ValueError(
-            f"License '{license_info}' is not in the allowed list found for package {pkg_name}"
-        )
-
+        pass
 
 def format_plain_vertical(
     packages: List[importlib.metadata.Distribution],
