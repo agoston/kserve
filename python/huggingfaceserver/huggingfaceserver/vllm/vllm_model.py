@@ -24,9 +24,16 @@ from vllm.entrypoints.logger import RequestLogger
 from vllm.engine.protocol import EngineClient
 from vllm.entrypoints.openai.serving_completion import OpenAIServingCompletion
 from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
-from vllm.entrypoints.openai.serving_embedding import OpenAIServingEmbedding
-from vllm.entrypoints.openai.serving_score import ServingScores
-from vllm.entrypoints.openai.tool_parsers import ToolParserManager
+try:
+    from vllm.entrypoints.pooling.embed.serving import OpenAIServingEmbedding
+    from vllm.entrypoints.pooling.score.serving import ServingScores
+except ImportError:
+    from vllm.entrypoints.openai.serving_embedding import OpenAIServingEmbedding
+    from vllm.entrypoints.openai.serving_score import ServingScores
+try:
+    from vllm.tool_parsers import ToolParserManager
+except ImportError:
+    from vllm.entrypoints.openai.tool_parsers import ToolParserManager
 from vllm.entrypoints.openai.serving_models import BaseModelPath, OpenAIServingModels
 from vllm.entrypoints.openai.cli_args import validate_parsed_serve_args
 from vllm.entrypoints.chat_utils import load_chat_template
@@ -73,6 +80,14 @@ class VLLMModel(
     ):
         super().__init__(model_name)
         self.args = args
+        if not hasattr(self.args, "enable_reasoning"):
+            self.args.enable_reasoning = False
+        if not hasattr(self.args, "reasoning_parser"):
+            self.args.reasoning_parser = None
+        if not hasattr(self.args, "enable_prompt_tokens_details"):
+            self.args.enable_prompt_tokens_details = False
+        if not hasattr(self.args, "prompt_adapters"):
+            self.args.prompt_adapters = None
         validate_parsed_serve_args(args)
         engine_args = build_vllm_engine_args(args)
         self.vllm_engine_args = engine_args
@@ -124,7 +139,10 @@ class VLLMModel(
             ]
 
             self.log_stats = not self.args.disable_log_stats
-            self.model_config = await self.engine_client.get_model_config()
+            if hasattr(self.engine_client, "get_model_config"):
+                self.model_config = await self.engine_client.get_model_config()
+            else:
+                self.model_config = self.engine_client.model_config
 
             resolved_chat_template = load_chat_template(self.args.chat_template)
 
@@ -133,7 +151,6 @@ class VLLMModel(
                 model_config=self.model_config,
                 base_model_paths=self.base_model_paths,
                 lora_modules=self.args.lora_modules,
-                prompt_adapters=self.args.prompt_adapters,
             )
             await self.openai_serving_models.init_static_loras()
 
@@ -177,7 +194,7 @@ class VLLMModel(
                     chat_template=resolved_chat_template,
                     chat_template_content_format=self.args.chat_template_content_format,
                 )
-                if self.model_config.task == "embed"
+                if getattr(self.model_config, "runner_type", None) == "pooling" or getattr(self.model_config, "task", None) == "embed"
                 else None
             )
 
@@ -188,7 +205,7 @@ class VLLMModel(
                     self.openai_serving_models,
                     request_logger=self.request_logger,
                 )
-                if self.model_config.task == "classify"
+                if getattr(self.model_config, "runner_type", None) == "pooling" or getattr(self.model_config, "task", None) == "classify"
                 else None
             )
 
@@ -204,12 +221,9 @@ class VLLMModel(
 
     def stop_engine(self):
         if self.engine_client:
-            # V1 AsyncLLM
-            if envs.VLLM_USE_V1:
+            if hasattr(self.engine_client, "shutdown"):
                 self.engine_client.shutdown()
-
-            # V0 AsyncLLMEngine
-            else:
+            elif hasattr(self.engine_client, "shutdown_background_loop"):
                 self.engine_client.shutdown_background_loop()
         self.ready = False
 

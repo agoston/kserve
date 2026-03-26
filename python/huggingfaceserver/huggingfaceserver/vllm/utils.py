@@ -66,7 +66,10 @@ def maybe_add_vllm_cli_parser(parser: Any) -> Any:
 def build_vllm_engine_args(args) -> Any:
     if not _vllm:
         return None
-    return AsyncEngineArgs.from_cli_args(args)
+    engine_args = AsyncEngineArgs.from_cli_args(args)
+    if hasattr(engine_args, "enable_log_requests") and hasattr(args, "disable_log_requests"):
+        engine_args.enable_log_requests = not args.disable_log_requests
+    return engine_args
 
 
 @asynccontextmanager
@@ -87,7 +90,7 @@ async def build_async_engine_client_from_engine_args(
     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
 
     # V1 AsyncLLM.
-    if envs.VLLM_USE_V1:
+    if getattr(envs, "VLLM_USE_V1", False):
         if disable_frontend_multiprocessing:
             logger.warning(
                 "V1 is enabled, but got --disable-frontend-multiprocessing. "
@@ -101,7 +104,7 @@ async def build_async_engine_client_from_engine_args(
             async_llm = AsyncLLM.from_vllm_config(
                 vllm_config=vllm_config,
                 usage_context=usage_context,
-                disable_log_requests=engine_args.disable_log_requests,
+                enable_log_requests=getattr(engine_args, "enable_log_requests", not getattr(engine_args, "disable_log_requests", False)),
                 disable_log_stats=engine_args.disable_log_stats,
             )
             yield async_llm
@@ -115,7 +118,7 @@ async def build_async_engine_client_from_engine_args(
             engine_client = AsyncLLMEngine.from_vllm_config(
                 vllm_config=vllm_config,
                 usage_context=usage_context,
-                disable_log_requests=engine_args.disable_log_requests,
+                enable_log_requests=getattr(engine_args, "enable_log_requests", not getattr(engine_args, "disable_log_requests", False)),
                 disable_log_stats=engine_args.disable_log_stats,
             )
             yield engine_client
