@@ -56,8 +56,8 @@ class VLLMModel(
     OpenAIEncoderModel, OpenAIGenerativeModel
 ):  # pylint:disable=c-extension-no-member
     engine_client: EngineClient
-    vllm_engine_args: AsyncEngineArgs = None
-    args: Namespace = None
+    vllm_engine_args: Optional[AsyncEngineArgs] = None
+    args: Optional[Namespace] = None
     ready: bool = False
     openai_serving_models: Optional[OpenAIServingModels] = None
     openai_serving_completion: Optional[OpenAIServingCompletion] = None
@@ -78,7 +78,7 @@ class VLLMModel(
         self.vllm_engine_args = engine_args
         self.request_logger = request_logger
         self.model_name = model_name
-        self.base_model_paths = []
+        self.base_model_paths: list[BaseModelPath] = []
         self.log_stats = True
         self.model_config = None
 

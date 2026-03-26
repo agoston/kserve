@@ -71,11 +71,16 @@ def is_vllm_backend_enabled(
 
 
 try:
-    from vllm.utils import FlexibleArgumentParser
+    from vllm.utils.argparse_utils import FlexibleArgumentParser
 
-    parser = FlexibleArgumentParser(parents=[kserve.model_server.parser])
+    parser: argparse.ArgumentParser = FlexibleArgumentParser(parents=[kserve.model_server.parser])
 except ImportError:
-    parser = argparse.ArgumentParser(parents=[kserve.model_server.parser])
+    try:
+        from vllm.utils import FlexibleArgumentParser
+
+        parser: argparse.ArgumentParser = FlexibleArgumentParser(parents=[kserve.model_server.parser])
+    except ImportError:
+        parser = argparse.ArgumentParser(parents=[kserve.model_server.parser])
 
 parser.add_argument(
     "--model_dir",

@@ -30,7 +30,7 @@ try:
 
     _vllm = True
 except ImportError:
-    AsyncEngineArgs = Any
+    AsyncEngineArgs = Any  # type: ignore
     _vllm = False
 
 from transformers import AutoConfig
@@ -57,13 +57,13 @@ def infer_vllm_supported_from_model_architecture(
     return True
 
 
-def maybe_add_vllm_cli_parser(parser: ArgumentParser) -> ArgumentParser:
+def maybe_add_vllm_cli_parser(parser: Any) -> Any:
     if not _vllm:
         return parser
     return make_arg_parser(parser)
 
 
-def build_vllm_engine_args(args) -> "AsyncEngineArgs":
+def build_vllm_engine_args(args) -> Any:
     if not _vllm:
         return None
     return AsyncEngineArgs.from_cli_args(args)
